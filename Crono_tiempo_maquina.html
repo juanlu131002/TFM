@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cronómetro Hall - Máquinas</title>
+  <style>
+    body { font-family:Arial,sans-serif; background:#f3f4f6; margin:0; padding:30px; color:#111827; }
+    .contenedor { max-width:1450px; margin:auto; }
+    h1 { margin-bottom:5px; }
+    .subtitulo { color:#6b7280; margin-bottom:20px; }
+    .panel { background:#fff; border-radius:14px; padding:20px; margin-bottom:24px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    .estado-conexion { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:#e5e7eb; font-size:13px; margin-bottom:15px; }
+    .punto { width:9px; height:9px; border-radius:50%; background:#f59e0b; }
+    .punto.ok { background:#16a34a; }.punto.error{background:#dc2626}
+    .hall-panel { min-height:520px; background:#f9fafb; border:2px solid #e5e7eb; border-radius:18px; padding:25px; display:grid; grid-template-columns:1fr 1.15fr 1.25fr; gap:25px; align-items:start; }
+    .zona-lateral,.zona-centro { display:flex; flex-direction:column; gap:18px; }
+    .zona-izquierda { padding-top:70px; }.zona-derecha{padding-top:20px}.zona-centro{justify-content:center;padding-top:65px}
+    .zona-lateral h3,.zona-centro h3 { text-align:center; margin-top:0; color:#374151; }
+    .maquina-box { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    button { border:none; border-radius:12px; padding:12px 16px; font-size:15px; cursor:pointer; font-weight:bold; }
+    button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#6b7280}.btn-ticket{background:#16a34a;color:#fff;width:100%;font-size:18px;padding:16px;margin-top:10px}.btn-csv{background:#7c3aed;color:#fff}
+    .tarjeta-maquina { margin-top:12px; padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f59e0b; border-radius:12px; }
+    .paciente-numero{font-size:22px;font-weight:bold;margin-bottom:8px}.tiempo-activo{font-size:22px;font-weight:bold;margin-bottom:8px}.detalle{color:#4b5563;font-size:14px;margin-bottom:6px}
+    .contador-central { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:15px; text-align:center; line-height:1.9; color:#374151; }
+    .mensaje { min-height:22px; text-align:center; font-weight:bold; }.mensaje.error{color:#b91c1c}.mensaje.ok{color:#15803d}
+    .columnas { display:grid; grid-template-columns:1fr 1fr; gap:20px; }.lista{display:flex;flex-direction:column;gap:12px;margin-top:15px}.paciente-card{border:1px solid #e5e7eb;border-left:6px solid #2563eb;border-radius:12px;padding:14px;background:#f9fafb}.paciente-card.izq{border-left-color:#0891b2}.paciente-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+    table { width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; background:#fff; } th,td{border:1px solid #d1d5db;padding:8px;text-align:center}th{background:#e5e7eb}
+    .barra { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
+    @media(max-width:1000px){body{padding:15px}.hall-panel{grid-template-columns:1fr;min-height:auto}.zona-izquierda,.zona-derecha,.zona-centro{padding-top:0}.columnas{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="contenedor">
+  <h1>Cronómetro Hall - Máquinas</h1>
+  <div class="subtitulo">Los pacientes llegan desde el HTML de entrada. Aquí solo se asignan a máquina y se finalizan.</div>
+  <div class="estado-conexion"><span id="puntoConexion" class="punto"></span><span id="textoConexion">Conectando con la base de datos…</span></div>
+
+  <div class="panel">
+    <div class="hall-panel">
+      <div class="zona-lateral zona-izquierda">
+        <h3>Máquinas izquierda</h3>
+        <div id="maquina_I1" class="maquina-box"></div>
+        <div id="maquina_I2" class="maquina-box"></div>
+        <div id="maquina_I3" class="maquina-box"></div>
+      </div>
+
+      <div class="zona-centro">
+        <h3>Pacientes esperando</h3>
+        <div class="contador-central">
+          <div>Izquierda: <strong id="contadorIzq">0</strong></div>
+          <div>Derecha: <strong id="contadorDer">0</strong></div>
+          <div>En máquina: <strong id="contadorMaq">0</strong></div>
+        </div>
+        <div id="mensaje" class="mensaje"></div>
+      </div>
+
+      <div class="zona-lateral zona-derecha">
+        <h3>Máquinas derecha</h3>
+        <div id="maquina_D1" class="maquina-box"></div>
+        <div id="maquina_D2" class="maquina-box"></div>
+        <div id="maquina_D3" class="maquina-box"></div>
+        <div id="maquina_D4" class="maquina-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="columnas">
+    <div class="panel"><h2>Cola izquierda</h2><div id="listaIzq" class="lista"></div></div>
+    <div class="panel"><h2>Cola derecha</h2><div id="listaDer" class="lista"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="barra"><h2>Registros finalizados</h2><button class="btn-csv" onclick="descargarCSV()">Descargar CSV</button></div>
+    <table>
+      <thead><tr><th>Paciente</th><th>Cola</th><th>Máquina</th><th>Entrada cola</th><th>Entrada máquina</th><th>Ticket</th><th>Tiempo cola</th><th>Tiempo máquina</th><th>Total</th></tr></thead>
+      <tbody id="tablaFinalizados"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://xdhufxqrnfqknarfujsk.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_vWokx1TIPhSXSMyU7s3d9g_pAu_Q02E";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  const maquinas = [
+    {id:'I1', cola:'Izquierda', clase:'btn-i'}, {id:'I2', cola:'Izquierda', clase:'btn-i'}, {id:'I3', cola:'Izquierda', clase:'btn-i'},
+    {id:'D1', cola:'Derecha', clase:'btn-d'}, {id:'D2', cola:'Derecha', clase:'btn-d'}, {id:'D3', cola:'Derecha', clase:'btn-d'}, {id:'D4', cola:'Derecha', clase:'btn-d'}
+  ];
+
+  let pacientes = [];
+  let operacionEnCurso = false;
+
+  function setConexion(tipo,texto){const p=document.getElementById('puntoConexion');p.className='punto'+(tipo?' '+tipo:'');document.getElementById('textoConexion').textContent=texto}
+  function mostrarMensaje(texto,tipo=''){const e=document.getElementById('mensaje');e.textContent=texto;e.className='mensaje'+(tipo?' '+tipo:'');if(texto)setTimeout(()=>{if(e.textContent===texto)e.textContent=''},3500)}
+  function formatearHora(iso){if(!iso)return'-';return new Date(iso).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  function formatearFechaHora(iso){if(!iso)return'-';return new Date(iso).toLocaleString('es-ES',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  function segundosEntre(a,b){if(!a||!b)return null;return Math.max(0,Math.round((new Date(b)-new Date(a))/1000))}
+  function segundosDesde(a){if(!a)return 0;return Math.max(0,Math.round((Date.now()-new Date(a).getTime())/1000))}
+  function formatearDuracion(s){if(s===null||s===undefined)return'-';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),seg=s%60;if(h>0)return`${h}h ${m}m ${seg}s`;if(m>0)return`${m}m ${seg}s`;return`${seg}s`}
+
+  async function cargarPacientes(){
+    const {data,error}=await db.from('pacientes').select('*').order('hora_cola',{ascending:true});
+    if(error){console.error(error);setConexion('error','Error de conexión con Supabase');mostrarMensaje('No se pudieron cargar los datos. Comprueba el SQL de configuración.','error');return}
+    pacientes=data||[];setConexion('ok','Conectado · datos compartidos en tiempo real');pintarPantalla();
+  }
+
+  async function pasarSiguienteAMaquina(cola,maquina){
+    if(operacionEnCurso)return;
+    operacionEnCurso=true;
+    const {data,error}=await db.rpc('asignar_siguiente_a_maquina',{p_cola:cola,p_maquina:maquina});
+    operacionEnCurso=false;
+    if(error){console.error(error);mostrarMensaje(error.message,'error');await cargarPacientes();return}
+    const p=Array.isArray(data)?data[0]:data;
+    mostrarMensaje(`Paciente ${p?.numero??''} asignado a ${maquina}.`,'ok');
+    await cargarPacientes();
+  }
+
+  async function ticketExpedido(id,numero){
+    if(operacionEnCurso)return;
+    operacionEnCurso=true;
+    const {error}=await db.rpc('finalizar_paciente',{p_id:id});
+    operacionEnCurso=false;
+    if(error){console.error(error);mostrarMensaje(error.message,'error');await cargarPacientes();return}
+    mostrarMensaje(`Paciente ${numero} finalizado. Máquina liberada.`,'ok');
+    await cargarPacientes();
+  }
+
+  function pintarMaquina(m){
+    const cont=document.getElementById('maquina_'+m.id);
+    const p=pacientes.find(x=>x.estado==='maquina'&&x.maquina===m.id);
+    if(!p){
+      cont.innerHTML=`<button class="btn-maquina ${m.clase}" onclick="pasarSiguienteAMaquina('${m.cola}','${m.id}')">${m.id}</button>`;
+      return;
+    }
+    const tMaq=segundosDesde(p.hora_maquina),tTotal=segundosDesde(p.hora_cola),tCola=segundosEntre(p.hora_cola,p.hora_maquina);
+    cont.innerHTML=`
+      <button class="btn-maquina ocupada" disabled>${m.id} OCUPADA</button>
+      <div class="tarjeta-maquina">
+        <div class="paciente-numero">Paciente ${p.numero}</div>
+        <div class="tiempo-activo">${formatearDuracion(tMaq)}</div>
+        <div class="detalle">Cola inicial: ${p.cola}</div>
+        <div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>
+        <div class="detalle">Entrada en máquina: ${formatearHora(p.hora_maquina)}</div>
+        <div class="detalle">Tiempo previo en cola: ${formatearDuracion(tCola)}</div>
+        <div class="detalle">Tiempo total acumulado: ${formatearDuracion(tTotal)}</div>
+        <button class="btn-ticket" onclick="ticketExpedido(${p.id},${p.numero})">✅ TICKET EXPEDIDO<br>LIBERAR MÁQUINA</button>
+      </div>`;
+  }
+
+  function tarjetaCola(p){
+    const d=document.createElement('div');d.className='paciente-card'+(p.cola==='Izquierda'?' izq':'');
+    d.innerHTML=`<div class="paciente-header"><div class="paciente-numero">Paciente ${p.numero}</div><div class="tiempo-activo">${formatearDuracion(segundosDesde(p.hora_cola))}</div></div><div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>`;
+    return d;
+  }
+
+  function pintarPantalla(){
+    maquinas.forEach(pintarMaquina);
+    const izq=pacientes.filter(p=>p.estado==='cola'&&p.cola==='Izquierda');
+    const der=pacientes.filter(p=>p.estado==='cola'&&p.cola==='Derecha');
+    const maq=pacientes.filter(p=>p.estado==='maquina');
+    const fin=pacientes.filter(p=>p.estado==='finalizado').sort((a,b)=>new Date(b.hora_papel)-new Date(a.hora_papel));
+
+    const li=document.getElementById('listaIzq'),ld=document.getElementById('listaDer');li.innerHTML='';ld.innerHTML='';
+    if(!izq.length)li.innerHTML='<p>No hay pacientes esperando.</p>';if(!der.length)ld.innerHTML='<p>No hay pacientes esperando.</p>';
+    izq.forEach(p=>li.appendChild(tarjetaCola(p)));der.forEach(p=>ld.appendChild(tarjetaCola(p)));
+    document.getElementById('contadorIzq').textContent=izq.length;document.getElementById('contadorDer').textContent=der.length;document.getElementById('contadorMaq').textContent=maq.length;
+
+    const tb=document.getElementById('tablaFinalizados');tb.innerHTML='';
+    fin.forEach(p=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${p.numero}</td><td>${p.cola}</td><td>${p.maquina||'-'}</td><td>${formatearFechaHora(p.hora_cola)}</td><td>${formatearFechaHora(p.hora_maquina)}</td><td>${formatearFechaHora(p.hora_papel)}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_maquina))}</td><td>${formatearDuracion(segundosEntre(p.hora_maquina,p.hora_papel))}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_papel))}</td>`;
+      tb.appendChild(tr);
+    });
+    if(!fin.length)tb.innerHTML='<tr><td colspan="9">No hay pacientes finalizados.</td></tr>';
+  }
+
+  function descargarCSV(){
+    const fin=pacientes.filter(p=>p.estado==='finalizado').sort((a,b)=>new Date(a.hora_papel)-new Date(b.hora_papel));
+    if(!fin.length){mostrarMensaje('No hay pacientes finalizados para exportar.','error');return}
+    let csv='\uFEFFPaciente;Cola;Máquina;Entrada en cola;Entrada en máquina;Ticket expedido;Tiempo cola segundos;Tiempo máquina segundos;Tiempo total segundos\n';
+    fin.forEach(p=>{csv += [p.numero,p.cola,p.maquina||'',formatearFechaHora(p.hora_cola),formatearFechaHora(p.hora_maquina),formatearFechaHora(p.hora_papel),segundosEntre(p.hora_cola,p.hora_maquina),segundosEntre(p.hora_maquina,p.hora_papel),segundosEntre(p.hora_cola,p.hora_papel)].join(';')+'\n'});
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tiempos_hall_colas_maquinas.csv';a.click();URL.revokeObjectURL(url);
+  }
+
+  db.channel('pacientes-maquinas-tiempo-real')
+    .on('postgres_changes',{event:'*',schema:'public',table:'pacientes'},()=>cargarPacientes())
+    .subscribe(status=>{if(status==='SUBSCRIBED')setConexion('ok','Conectado · datos compartidos en tiempo real')});
+
+  setInterval(pintarPantalla,1000);
+  cargarPacientes();
+</script>
+</body>
+</html>

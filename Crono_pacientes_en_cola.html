@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pacientes en cola</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:30px; color:#111827; }
+    .contenedor { max-width:1100px; margin:auto; }
+    h1 { margin-bottom:5px; }
+    .subtitulo { color:#6b7280; margin-bottom:20px; }
+    .panel { background:white; border-radius:14px; padding:20px; margin-bottom:22px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    .estado-conexion { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:#e5e7eb; font-size:13px; margin-bottom:15px; }
+    .punto { width:9px; height:9px; border-radius:50%; background:#f59e0b; }
+    .punto.ok { background:#16a34a; }
+    .punto.error { background:#dc2626; }
+    .botones { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px; }
+    button { border:none; border-radius:12px; padding:18px 16px; font-size:19px; cursor:pointer; font-weight:bold; }
+    button:hover { opacity:.92; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .btn-izq { background:#0891b2; color:white; }
+    .btn-der { background:#2563eb; color:white; }
+    .btn-borrar { background:#ef4444; color:white; font-size:13px; padding:8px 10px; }
+    .resumen { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:18px; }
+    .resumen-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px; text-align:center; }
+    .resumen-numero { font-size:28px; font-weight:bold; }
+    .resumen-label { color:#6b7280; font-size:13px; }
+    .columnas { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .lista { display:flex; flex-direction:column; gap:12px; margin-top:15px; }
+    .paciente { border:1px solid #e5e7eb; border-left:6px solid #2563eb; border-radius:12px; padding:14px; background:#f9fafb; }
+    .paciente.izq { border-left-color:#0891b2; }
+    .cabecera { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
+    .numero { font-size:22px; font-weight:bold; }
+    .tiempo { font-size:20px; font-weight:bold; }
+    .detalle { color:#4b5563; font-size:14px; margin:6px 0; }
+    .acciones { display:flex; justify-content:flex-end; margin-top:10px; }
+    .vacio { color:#6b7280; }
+    .mensaje { min-height:22px; margin-top:12px; font-weight:bold; }
+    .mensaje.error { color:#b91c1c; }
+    .mensaje.ok { color:#15803d; }
+    @media(max-width:800px){ body{padding:15px}.botones,.columnas,.resumen{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+<div class="contenedor">
+  <h1>Entrada de pacientes y colas</h1>
+  <div class="subtitulo">Registra la llegada y decide si el paciente va a la cola izquierda o derecha. Las máquinas se gestionan desde el otro HTML.</div>
+
+  <div class="estado-conexion"><span id="puntoConexion" class="punto"></span><span id="textoConexion">Conectando con la base de datos…</span></div>
+
+  <div class="panel">
+    <h2>Nuevo paciente</h2>
+    <p>Pulsa el lado correspondiente cuando el paciente entra en la cola.</p>
+    <div class="botones">
+      <button id="btnIzq" class="btn-izq" onclick="nuevoPaciente('Izquierda')">+ Paciente · Cola izquierda</button>
+      <button id="btnDer" class="btn-der" onclick="nuevoPaciente('Derecha')">+ Paciente · Cola derecha</button>
+    </div>
+    <div id="mensaje" class="mensaje"></div>
+
+    <div class="resumen">
+      <div class="resumen-card"><div id="resumenIzq" class="resumen-numero">0</div><div class="resumen-label">Esperando izquierda</div></div>
+      <div class="resumen-card"><div id="resumenDer" class="resumen-numero">0</div><div class="resumen-label">Esperando derecha</div></div>
+      <div class="resumen-card"><div id="ultimoPaciente" class="resumen-numero">-</div><div class="resumen-label">Último paciente creado</div></div>
+    </div>
+  </div>
+
+  <div class="columnas">
+    <div class="panel"><h2>Cola izquierda</h2><div id="listaIzq" class="lista"></div></div>
+    <div class="panel"><h2>Cola derecha</h2><div id="listaDer" class="lista"></div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://xdhufxqrnfqknarfujsk.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_vWokx1TIPhSXSMyU7s3d9g_pAu_Q02E";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  let pacientes = [];
+  let creando = false;
+
+  function setConexion(tipo, texto) {
+    const punto = document.getElementById('puntoConexion');
+    punto.className = 'punto' + (tipo ? ' ' + tipo : '');
+    document.getElementById('textoConexion').textContent = texto;
+  }
+
+  function mostrarMensaje(texto, tipo='') {
+    const el = document.getElementById('mensaje');
+    el.textContent = texto;
+    el.className = 'mensaje' + (tipo ? ' ' + tipo : '');
+    if (texto) setTimeout(() => { if (el.textContent === texto) el.textContent = ''; }, 3000);
+  }
+
+  function formatearHora(iso) {
+    if (!iso) return '-';
+    return new Date(iso).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+
+  function segundosDesde(iso) {
+    if (!iso) return 0;
+    return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  }
+
+  function formatearDuracion(s) {
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), seg = s%60;
+    if (h > 0) return `${h}h ${m}m ${seg}s`;
+    if (m > 0) return `${m}m ${seg}s`;
+    return `${seg}s`;
+  }
+
+  async function cargarPacientes() {
+    const { data, error } = await db
+      .from('pacientes')
+      .select('*')
+      .eq('estado', 'cola')
+      .order('hora_cola', { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setConexion('error', 'Error de conexión con Supabase');
+      mostrarMensaje('No se pudieron cargar los pacientes. Comprueba que has ejecutado el SQL de configuración.', 'error');
+      return;
+    }
+
+    pacientes = data || [];
+    setConexion('ok', 'Conectado · datos compartidos en tiempo real');
+    pintarPantalla();
+  }
+
+  async function nuevoPaciente(cola) {
+    if (creando) return;
+    creando = true;
+    document.getElementById('btnIzq').disabled = true;
+    document.getElementById('btnDer').disabled = true;
+
+    const { data, error } = await db.rpc('crear_paciente', { p_cola: cola });
+
+    creando = false;
+    document.getElementById('btnIzq').disabled = false;
+    document.getElementById('btnDer').disabled = false;
+
+    if (error) {
+      console.error(error);
+      mostrarMensaje('Error al crear el paciente: ' + error.message, 'error');
+      return;
+    }
+
+    const p = Array.isArray(data) ? data[0] : data;
+    mostrarMensaje(`Paciente ${p?.numero ?? ''} añadido a ${cola.toLowerCase()}.`, 'ok');
+    await cargarPacientes();
+  }
+
+  async function borrarPaciente(id, numero) {
+    if (!confirm(`¿Borrar el paciente ${numero}? Solo se puede borrar mientras siga esperando en cola.`)) return;
+    const { data, error } = await db.rpc('borrar_paciente_en_cola', { p_id: id });
+    if (error) {
+      mostrarMensaje('No se pudo borrar: ' + error.message, 'error');
+      return;
+    }
+    if (!data) mostrarMensaje('Ese paciente ya ha pasado a máquina y no se puede borrar desde aquí.', 'error');
+    await cargarPacientes();
+  }
+
+  function tarjetaPaciente(p) {
+    const div = document.createElement('div');
+    div.className = 'paciente' + (p.cola === 'Izquierda' ? ' izq' : '');
+    div.innerHTML = `
+      <div class="cabecera">
+        <div class="numero">Paciente ${p.numero}</div>
+        <div class="tiempo">${formatearDuracion(segundosDesde(p.hora_cola))}</div>
+      </div>
+      <div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>
+      <div class="acciones"><button class="btn-borrar" onclick="borrarPaciente(${p.id}, ${p.numero})">Borrar entrada</button></div>
+    `;
+    return div;
+  }
+
+  function pintarPantalla() {
+    const izq = pacientes.filter(p => p.cola === 'Izquierda');
+    const der = pacientes.filter(p => p.cola === 'Derecha');
+    const listaIzq = document.getElementById('listaIzq');
+    const listaDer = document.getElementById('listaDer');
+    listaIzq.innerHTML = '';
+    listaDer.innerHTML = '';
+
+    if (!izq.length) listaIzq.innerHTML = '<div class="vacio">No hay pacientes esperando.</div>';
+    if (!der.length) listaDer.innerHTML = '<div class="vacio">No hay pacientes esperando.</div>';
+    izq.forEach(p => listaIzq.appendChild(tarjetaPaciente(p)));
+    der.forEach(p => listaDer.appendChild(tarjetaPaciente(p)));
+
+    document.getElementById('resumenIzq').textContent = izq.length;
+    document.getElementById('resumenDer').textContent = der.length;
+    document.getElementById('ultimoPaciente').textContent = pacientes.length ? Math.max(...pacientes.map(p => Number(p.numero))) : '-';
+  }
+
+  db.channel('pacientes-cola-tiempo-real')
+    .on('postgres_changes', { event:'*', schema:'public', table:'pacientes' }, () => cargarPacientes())
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') setConexion('ok', 'Conectado · datos compartidos en tiempo real');
+    });
+
+  setInterval(pintarPantalla, 1000);
+  cargarPacientes();
+</script>
+</body>
+</html>

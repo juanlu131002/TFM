@@ -1,0 +1,18 @@
+CRONÓMETROS - LISTO PARA VERCEL
+
+Archivos web:
+- index.html -> menú principal con 3 botones
+- Crono_pacientes_en_cola.html -> entrada y cola izquierda/derecha (compartido)
+- Crono_tiempo_maquina.html -> máquinas y ticket (compartido)
+- Crono_takt_time.html -> Takt Time de llegadas (independiente por sesión)
+
+Antes de usar Takt Time:
+1. En Supabase abre SQL Editor.
+2. Abre supabase_setup_takt.sql y copia todo.
+3. Pégalo en una New Query y pulsa Run.
+4. Si aparece Success, ya está.
+
+El SQL anterior de pacientes NO hay que repetirlo.
+
+Para Vercel:
+- Sube el contenido de esta carpeta manteniendo index.html en la raíz.
