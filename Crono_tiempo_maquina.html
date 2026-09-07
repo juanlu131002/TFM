@@ -19,7 +19,8 @@
     .zona-lateral h3,.zona-centro h3 { text-align:center; margin-top:0; color:#374151; }
     .maquina-box { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
     button { border:none; border-radius:12px; padding:12px 16px; font-size:15px; cursor:pointer; font-weight:bold; }
-    button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#6b7280}.btn-ticket{background:#16a34a;color:#fff;width:100%;font-size:18px;padding:16px;margin-top:10px}.btn-csv{background:#7c3aed;color:#fff}
+    button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#dc2626}.btn-csv{background:#7c3aed;color:#fff}
+    .datos-finalizacion{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.campo label{display:block;font-size:12px;font-weight:bold;color:#4b5563;margin:0 0 5px}.campo select,.campo input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px}.campo-otra{grid-column:1/-1}.aviso-finalizar{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
     .tarjeta-maquina { margin-top:12px; padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f59e0b; border-radius:12px; }
     .paciente-numero{font-size:22px;font-weight:bold;margin-bottom:8px}.tiempo-activo{font-size:22px;font-weight:bold;margin-bottom:8px}.detalle{color:#4b5563;font-size:14px;margin-bottom:6px}
     .contador-central { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:15px; text-align:center; line-height:1.9; color:#374151; }
@@ -73,7 +74,7 @@
   <div class="panel">
     <div class="barra"><h2>Registros finalizados</h2><button class="btn-csv" onclick="descargarCSV()">Descargar CSV</button></div>
     <table>
-      <thead><tr><th>Paciente</th><th>Cola</th><th>Máquina</th><th>Entrada cola</th><th>Entrada máquina</th><th>Ticket</th><th>Tiempo cola</th><th>Tiempo máquina</th><th>Total</th></tr></thead>
+      <thead><tr><th>Paciente</th><th>Cola</th><th>Máquina</th><th>Entrada cola</th><th>Entrada máquina</th><th>Ticket</th><th>Tiempo cola</th><th>Tiempo máquina</th><th>Total</th><th>Método</th><th>Incidencia</th><th>Comentario</th></tr></thead>
       <tbody id="tablaFinalizados"></tbody>
     </table>
   </div>
@@ -92,6 +93,7 @@
 
   let pacientes = [];
   let operacionEnCurso = false;
+  const datosFinalizacion = {}; // se conserva mientras la máquina está ocupada
 
   function setConexion(tipo,texto){const p=document.getElementById('puntoConexion');p.className='punto'+(tipo?' '+tipo:'');document.getElementById('textoConexion').textContent=texto}
   function mostrarMensaje(texto,tipo=''){const e=document.getElementById('mensaje');e.textContent=texto;e.className='mensaje'+(tipo?' '+tipo:'');if(texto)setTimeout(()=>{if(e.textContent===texto)e.textContent=''},3500)}
@@ -118,13 +120,51 @@
     await cargarPacientes();
   }
 
-  async function ticketExpedido(id,numero){
+  function guardarSeleccion(maquina, campo, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    datosFinalizacion[maquina][campo] = valor;
+
+  }
+
+  function guardarComentario(maquina, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    datosFinalizacion[maquina].comentario = valor;
+  }
+
+  async function finalizarDesdeMaquina(id,numero,maquina){
     if(operacionEnCurso)return;
+    const datos = datosFinalizacion[maquina] || {};
+    const metodo = datos.metodo || '';
+    const incidencia = datos.incidencia || 'Sin incidencia';
+    const comentario = (datos.comentario || '').trim();
+
+    if(!metodo){
+      mostrarMensaje(`Selecciona DNI o Tarjeta sanitaria antes de finalizar ${maquina}.`,'error');
+      document.getElementById(`metodo_${maquina}`)?.focus();
+      return;
+    }
+
     operacionEnCurso=true;
+
+    const {error:errorDatos}=await db.rpc('guardar_datos_paciente',{
+      p_id:id,
+      p_metodo:metodo,
+      p_incidencia:incidencia,
+      p_comentario:comentario
+    });
+    if(errorDatos){
+      operacionEnCurso=false;
+      console.error(errorDatos);
+      mostrarMensaje('No se pudieron guardar método/incidencia/comentario: '+errorDatos.message,'error');
+      return;
+    }
+
     const {error}=await db.rpc('finalizar_paciente',{p_id:id});
     operacionEnCurso=false;
     if(error){console.error(error);mostrarMensaje(error.message,'error');await cargarPacientes();return}
-    mostrarMensaje(`Paciente ${numero} finalizado. Máquina liberada.`,'ok');
+
+    delete datosFinalizacion[maquina];
+    mostrarMensaje(`Paciente ${numero} finalizado en ${maquina}. Máquina liberada.`,'ok');
     await cargarPacientes();
   }
 
@@ -136,23 +176,48 @@
       return;
     }
     const tMaq=segundosDesde(p.hora_maquina),tTotal=segundosDesde(p.hora_cola),tCola=segundosEntre(p.hora_cola,p.hora_maquina);
+    const seleccion = datosFinalizacion[m.id] || {};
+    const metodo = seleccion.metodo || '';
+    const incidencia = seleccion.incidencia || 'Sin incidencia';
+    const comentario = seleccion.comentario || '';
     cont.innerHTML=`
-      <button class="btn-maquina ocupada" disabled>${m.id} OCUPADA</button>
+      <button class="btn-maquina ocupada" onclick="finalizarDesdeMaquina(${p.id},${p.numero},'${m.id}')">${m.id} · FINALIZAR PACIENTE</button>
       <div class="tarjeta-maquina">
         <div class="paciente-numero">Paciente ${p.numero}</div>
-        <div class="tiempo-activo">${formatearDuracion(tMaq)}</div>
-        <div class="detalle">Cola inicial: ${p.cola}</div>
-        <div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>
-        <div class="detalle">Entrada en máquina: ${formatearHora(p.hora_maquina)}</div>
-        <div class="detalle">Tiempo previo en cola: ${formatearDuracion(tCola)}</div>
-        <div class="detalle">Tiempo total acumulado: ${formatearDuracion(tTotal)}</div>
-        <button class="btn-ticket" onclick="ticketExpedido(${p.id},${p.numero})">✅ TICKET EXPEDIDO<br>LIBERAR MÁQUINA</button>
+        <div class="tiempo-activo" id="tiempoMaq_${m.id}">${formatearDuracion(tMaq)}</div>
+        <div class="datos-finalizacion">
+          <div class="campo">
+            <label for="metodo_${m.id}">Método</label>
+            <select id="metodo_${m.id}" onchange="guardarSeleccion('${m.id}','metodo',this.value)">
+              <option value="" ${metodo===''?'selected':''}>Seleccionar…</option>
+              <option value="DNI" ${metodo==='DNI'?'selected':''}>DNI</option>
+              <option value="Tarjeta sanitaria" ${metodo==='Tarjeta sanitaria'?'selected':''}>Tarjeta sanitaria</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="incidencia_${m.id}">Incidencia</label>
+            <select id="incidencia_${m.id}" onchange="guardarSeleccion('${m.id}','incidencia',this.value)">
+              <option value="Sin incidencia" ${incidencia==='Sin incidencia'?'selected':''}>Sin incidencia</option>
+              <option value="Sin papel" ${incidencia==='Sin papel'?'selected':''}>Sin papel</option>
+              <option value="No entrega papel" ${incidencia==='No entrega papel'?'selected':''}>No entrega papel</option>
+              <option value="Sin Wi-Fi" ${incidencia==='Sin Wi-Fi'?'selected':''}>Sin Wi-Fi</option>
+              <option value="Fallo lectura tarjeta sanitaria" ${incidencia==='Fallo lectura tarjeta sanitaria'?'selected':''}>Fallo lectura T. sanitaria</option>
+              <option value="Fallo lectura DNI" ${incidencia==='Fallo lectura DNI'?'selected':''}>Fallo lectura DNI</option>
+              <option value="Otra" ${incidencia==='Otra'?'selected':''}>Otra</option>
+            </select>
+          </div>
+          <div class="campo campo-otra">
+            <label for="comentario_${m.id}">Comentario</label>
+            <input id="comentario_${m.id}" type="text" value="${comentario.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" placeholder="Escribe aquí cualquier observación…" oninput="guardarComentario('${m.id}',this.value)">
+          </div>
+        </div>
+        <div class="aviso-finalizar">Selecciona el método y pulsa de nuevo ${m.id} para sacar al paciente.</div>
       </div>`;
   }
 
   function tarjetaCola(p){
     const d=document.createElement('div');d.className='paciente-card'+(p.cola==='Izquierda'?' izq':'');
-    d.innerHTML=`<div class="paciente-header"><div class="paciente-numero">Paciente ${p.numero}</div><div class="tiempo-activo">${formatearDuracion(segundosDesde(p.hora_cola))}</div></div><div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>`;
+    d.innerHTML=`<div class="paciente-header"><div class="paciente-numero">Paciente ${p.numero}</div><div class="tiempo-activo" id="tiempoCola_${p.id}">${formatearDuracion(segundosDesde(p.hora_cola))}</div></div><div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>`;
     return d;
   }
 
@@ -171,17 +236,17 @@
     const tb=document.getElementById('tablaFinalizados');tb.innerHTML='';
     fin.forEach(p=>{
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${p.numero}</td><td>${p.cola}</td><td>${p.maquina||'-'}</td><td>${formatearFechaHora(p.hora_cola)}</td><td>${formatearFechaHora(p.hora_maquina)}</td><td>${formatearFechaHora(p.hora_papel)}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_maquina))}</td><td>${formatearDuracion(segundosEntre(p.hora_maquina,p.hora_papel))}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_papel))}</td>`;
+      tr.innerHTML=`<td>${p.numero}</td><td>${p.cola}</td><td>${p.maquina||'-'}</td><td>${formatearFechaHora(p.hora_cola)}</td><td>${formatearFechaHora(p.hora_maquina)}</td><td>${formatearFechaHora(p.hora_papel)}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_maquina))}</td><td>${formatearDuracion(segundosEntre(p.hora_maquina,p.hora_papel))}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_papel))}</td><td>${p.metodo||'-'}</td><td>${p.incidencia||'Sin incidencia'}</td><td>${p.comentario||'-'}</td>`;
       tb.appendChild(tr);
     });
-    if(!fin.length)tb.innerHTML='<tr><td colspan="9">No hay pacientes finalizados.</td></tr>';
+    if(!fin.length)tb.innerHTML='<tr><td colspan="12">No hay pacientes finalizados.</td></tr>';
   }
 
   function descargarCSV(){
     const fin=pacientes.filter(p=>p.estado==='finalizado').sort((a,b)=>new Date(a.hora_papel)-new Date(b.hora_papel));
     if(!fin.length){mostrarMensaje('No hay pacientes finalizados para exportar.','error');return}
-    let csv='\uFEFFPaciente;Cola;Máquina;Entrada en cola;Entrada en máquina;Ticket expedido;Tiempo cola segundos;Tiempo máquina segundos;Tiempo total segundos\n';
-    fin.forEach(p=>{csv += [p.numero,p.cola,p.maquina||'',formatearFechaHora(p.hora_cola),formatearFechaHora(p.hora_maquina),formatearFechaHora(p.hora_papel),segundosEntre(p.hora_cola,p.hora_maquina),segundosEntre(p.hora_maquina,p.hora_papel),segundosEntre(p.hora_cola,p.hora_papel)].join(';')+'\n'});
+    let csv='\uFEFFPaciente;Cola;Máquina;Entrada en cola;Entrada en máquina;Ticket expedido;Tiempo cola segundos;Tiempo máquina segundos;Tiempo total segundos;Método;Incidencia;Comentario\n';
+    fin.forEach(p=>{csv += [p.numero,p.cola,p.maquina||'',formatearFechaHora(p.hora_cola),formatearFechaHora(p.hora_maquina),formatearFechaHora(p.hora_papel),segundosEntre(p.hora_cola,p.hora_maquina),segundosEntre(p.hora_maquina,p.hora_papel),segundosEntre(p.hora_cola,p.hora_papel),p.metodo||'',p.incidencia||'Sin incidencia',p.comentario||''].join(';')+'\n'});
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tiempos_hall_colas_maquinas.csv';a.click();URL.revokeObjectURL(url);
   }
 
@@ -189,7 +254,22 @@
     .on('postgres_changes',{event:'*',schema:'public',table:'pacientes'},()=>cargarPacientes())
     .subscribe(status=>{if(status==='SUBSCRIBED')setConexion('ok','Conectado · datos compartidos en tiempo real')});
 
-  setInterval(pintarPantalla,1000);
+  function actualizarCronometros(){
+    pacientes.filter(p=>p.estado==='maquina').forEach(p=>{
+      const maq=p.maquina;
+      const eMaq=document.getElementById(`tiempoMaq_${maq}`);
+      const eTotal=document.getElementById(`tiempoTotal_${maq}`);
+      if(eMaq)eMaq.textContent=formatearDuracion(segundosDesde(p.hora_maquina));
+      if(eTotal)eTotal.textContent=formatearDuracion(segundosDesde(p.hora_cola));
+    });
+
+    pacientes.filter(p=>p.estado==='cola').forEach(p=>{
+      const e=document.getElementById(`tiempoCola_${p.id}`);
+      if(e)e.textContent=formatearDuracion(segundosDesde(p.hora_cola));
+    });
+  }
+
+  setInterval(actualizarCronometros,1000);
   cargarPacientes();
 </script>
 </body>
