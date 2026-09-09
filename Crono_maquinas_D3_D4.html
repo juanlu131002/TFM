@@ -87,6 +87,15 @@
     {id:'D3', cola:'Derecha', clase:'btn-d'}, {id:'D4', cola:'Derecha', clase:'btn-d'}
   ];
 
+  // Para CAMBIO DE MÁQUINA se consideran todas las máquinas de la derecha,
+  // aunque no estén visibles en esta pantalla.
+  const maquinasCambio = [
+    {id:'D1', cola:'Derecha'},
+    {id:'D2', cola:'Derecha'},
+    {id:'D3', cola:'Derecha'},
+    {id:'D4', cola:'Derecha'}
+  ];
+
   let pacientes = [];
   let operacionEnCurso = false;
   const datosFinalizacion = {}; // se conserva mientras la máquina está ocupada
@@ -234,7 +243,7 @@
     const metodo = seleccion.metodo || '';
     const incidencias = Array.isArray(seleccion.incidencias) ? seleccion.incidencias : [];
     const comentario = seleccion.comentario || '';
-    const libres = maquinas.filter(x=>x.cola===m.cola && x.id!==m.id && !pacientes.some(pac=>pac.estado==='maquina'&&pac.maquina===x.id));
+    const libres = maquinasCambio.filter(x=>x.cola===m.cola && x.id!==m.id && !pacientes.some(pac=>pac.estado==='maquina'&&pac.maquina===x.id));
 
     const botonMetodo=(valor,texto)=>`<button type="button" class="btn-opcion btn-metodo ${metodo===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','metodo','${valor}')">${texto}</button>`;
     const botonIncidencia=(valor,texto)=>`<button type="button" class="btn-opcion btn-incidencia ${incidencias.includes(valor)?'activo':''}" onclick="toggleIncidencia('${m.id}','${valor.replace(/'/g,"\\'")}')">${texto}</button>`;
@@ -274,7 +283,7 @@
             <input id="comentario_${m.id}" type="text" value="${comentario.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" placeholder="Escribe aquí cualquier observación…" oninput="guardarComentario('${m.id}',this.value)">
           </div>
           <div class="campo campo-cambio separador-cambio">
-            <label>Cambio de máquina · solo aparecen las libres</label>
+            <label>Cambio de máquina · cualquier máquina libre de la derecha</label>
             <div class="grupo-botones">${botonesCambio}</div>
           </div>
         </div>
