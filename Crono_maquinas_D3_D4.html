@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cronómetro Hall - Máquinas D3–D4</title>
+  <style>
+    body { font-family:Arial,sans-serif; background:#f3f4f6; margin:0; padding:30px; color:#111827; }
+    .contenedor { max-width:1450px; margin:auto; }
+    h1 { margin-bottom:5px; }
+    .subtitulo { color:#6b7280; margin-bottom:20px; }
+    .panel { background:#fff; border-radius:14px; padding:20px; margin-bottom:24px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    .estado-conexion { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:#e5e7eb; font-size:13px; margin-bottom:15px; }
+    .punto { width:9px; height:9px; border-radius:50%; background:#f59e0b; }
+    .punto.ok { background:#16a34a; }.punto.error{background:#dc2626}
+    .hall-panel { min-height:420px; background:#f9fafb; border:2px solid #e5e7eb; border-radius:18px; padding:25px; display:grid; grid-template-columns:1.25fr 1fr; gap:25px; align-items:start; }
+    .zona-lateral,.zona-centro { display:flex; flex-direction:column; gap:18px; }
+    .zona-izquierda { padding-top:20px; }.zona-derecha{padding-top:20px}.zona-centro{justify-content:center;padding-top:55px}
+    .zona-lateral h3,.zona-centro h3 { text-align:center; margin-top:0; color:#374151; }
+    .maquina-box { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    button { border:none; border-radius:12px; padding:12px 16px; font-size:15px; cursor:pointer; font-weight:bold; }
+    button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#dc2626}.btn-csv{background:#7c3aed;color:#fff}
+    .datos-finalizacion{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}.campo label{display:block;font-size:12px;font-weight:bold;color:#4b5563;margin:0 0 7px}.campo input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;box-sizing:border-box}.campo-otra,.campo-cambio{grid-column:1/-1}.aviso-finalizar{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
+    .grupo-botones{display:flex;gap:7px;flex-wrap:wrap}.btn-opcion{padding:9px 11px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:9px;font-size:13px;line-height:1.15;box-shadow:none}.btn-opcion:hover{background:#eef2f7;opacity:1}.btn-opcion.activo{background:#0f172a;color:#fff;border-color:#0f172a}.btn-metodo{flex:1;min-width:125px}.btn-incidencia{flex:1 1 135px}.separador-cambio{border-top:1px solid #e5e7eb;margin-top:2px;padding-top:12px}.btn-cambio{background:#ecfdf5;color:#166534;border:1px solid #86efac;min-width:60px}.btn-cambio:hover{background:#dcfce7}.sin-maquinas-libres{font-size:13px;color:#6b7280;padding:8px 0}
+    .tarjeta-maquina { margin-top:12px; padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f59e0b; border-radius:12px; }
+    .paciente-numero{font-size:22px;font-weight:bold;margin-bottom:8px}.tiempo-activo{font-size:22px;font-weight:bold;margin-bottom:8px}.detalle{color:#4b5563;font-size:14px;margin-bottom:6px}
+    .contador-central { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:15px; text-align:center; line-height:1.9; color:#374151; }
+    .mensaje { min-height:22px; text-align:center; font-weight:bold; }.mensaje.error{color:#b91c1c}.mensaje.ok{color:#15803d}
+    .columnas { display:grid; grid-template-columns:1fr 1fr; gap:20px; }.lista{display:flex;flex-direction:column;gap:12px;margin-top:15px}.paciente-card{border:1px solid #e5e7eb;border-left:6px solid #2563eb;border-radius:12px;padding:14px;background:#f9fafb}.paciente-card.izq{border-left-color:#0891b2}.paciente-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+    table { width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; background:#fff; } th,td{border:1px solid #d1d5db;padding:8px;text-align:center}th{background:#e5e7eb}
+    .barra { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
+    @media(max-width:1000px){body{padding:15px}.hall-panel{grid-template-columns:1fr;min-height:auto}.zona-izquierda,.zona-derecha,.zona-centro{padding-top:0}.columnas{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="contenedor">
+  <h1>Cronómetro Hall - Máquinas D3–D4</h1>
+  <div class="subtitulo">Puesto de máquinas D3–D4. Los pacientes llegan desde el HTML de entrada y aquí se asignan, cambian de máquina y finalizan.</div>
+  <div class="estado-conexion"><span id="puntoConexion" class="punto"></span><span id="textoConexion">Conectando con la base de datos…</span></div>
+
+  <div class="panel">
+    <div class="hall-panel">
+      <div class="zona-lateral zona-derecha">
+        <h3>Máquinas D3–D4</h3>
+        <div id="maquina_D3" class="maquina-box"></div>
+        <div id="maquina_D4" class="maquina-box"></div>
+      </div>
+
+      <div class="zona-centro">
+        <h3>Pacientes esperando</h3>
+        <div class="contador-central">
+          <div>Derecha: <strong id="contadorDer">0</strong></div>
+          <div>En estas máquinas: <strong id="contadorMaq">0</strong></div>
+          <div style="display:none">Izquierda: <strong id="contadorIzq">0</strong></div>
+        </div>
+        <div id="mensaje" class="mensaje"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel"><h2>Cola derecha</h2><div id="listaDer" class="lista"></div><div id="listaIzq" style="display:none"></div></div>
+
+  <div class="panel">
+    <div class="barra"><h2>Registros finalizados</h2><button class="btn-csv" onclick="descargarCSV()">Descargar CSV</button></div>
+    <table>
+      <thead><tr><th>Paciente</th><th>Cola</th><th>Máquina</th><th>Entrada cola</th><th>Entrada máquina</th><th>Ticket</th><th>Tiempo cola</th><th>Tiempo máquina</th><th>Total</th><th>Método</th><th>Incidencia</th><th>Comentario</th></tr></thead>
+      <tbody id="tablaFinalizados"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://xdhufxqrnfqknarfujsk.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_vWokx1TIPhSXSMyU7s3d9g_pAu_Q02E";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  const maquinas = [
+    {id:'D3', cola:'Derecha', clase:'btn-d'}, {id:'D4', cola:'Derecha', clase:'btn-d'}
+  ];
+
+  let pacientes = [];
+  let operacionEnCurso = false;
+  const datosFinalizacion = {}; // se conserva mientras la máquina está ocupada
+
+  function setConexion(tipo,texto){const p=document.getElementById('puntoConexion');p.className='punto'+(tipo?' '+tipo:'');document.getElementById('textoConexion').textContent=texto}
+  function mostrarMensaje(texto,tipo=''){const e=document.getElementById('mensaje');e.textContent=texto;e.className='mensaje'+(tipo?' '+tipo:'');if(texto)setTimeout(()=>{if(e.textContent===texto)e.textContent=''},3500)}
+  function formatearHora(iso){if(!iso)return'-';return new Date(iso).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  function formatearFechaHora(iso){if(!iso)return'-';return new Date(iso).toLocaleString('es-ES',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  function segundosEntre(a,b){if(!a||!b)return null;return Math.max(0,Math.round((new Date(b)-new Date(a))/1000))}
+  function segundosDesde(a){if(!a)return 0;return Math.max(0,Math.round((Date.now()-new Date(a).getTime())/1000))}
+  function formatearDuracion(s){if(s===null||s===undefined)return'-';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),seg=s%60;if(h>0)return`${h}h ${m}m ${seg}s`;if(m>0)return`${m}m ${seg}s`;return`${seg}s`}
+
+  async function cargarPacientes(){
+    const {data,error}=await db.from('pacientes').select('*').order('hora_cola',{ascending:true});
+    if(error){console.error(error);setConexion('error','Error de conexión con Supabase');mostrarMensaje('No se pudieron cargar los datos. Comprueba el SQL de configuración.','error');return}
+    pacientes=data||[];setConexion('ok','Conectado · datos compartidos en tiempo real');pintarPantalla();
+  }
+
+  async function pasarSiguienteAMaquina(cola,maquina){
+    if(operacionEnCurso)return;
+    operacionEnCurso=true;
+    const {data,error}=await db.rpc('asignar_siguiente_a_maquina',{p_cola:cola,p_maquina:maquina});
+    operacionEnCurso=false;
+    if(error){console.error(error);mostrarMensaje(error.message,'error');await cargarPacientes();return}
+    const p=Array.isArray(data)?data[0]:data;
+    mostrarMensaje(`Paciente ${p?.numero??''} asignado a ${maquina}.`,'ok');
+    await cargarPacientes();
+  }
+
+  function guardarSeleccion(maquina, campo, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    datosFinalizacion[maquina][campo] = valor;
+
+  }
+
+  function guardarComentario(maquina, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    datosFinalizacion[maquina].comentario = valor;
+  }
+
+  function seleccionarOpcion(maquina, campo, valor){
+    guardarSeleccion(maquina, campo, valor);
+    pintarPantalla();
+  }
+
+  function toggleIncidencia(maquina, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    let incidencias = datosFinalizacion[maquina].incidencias;
+
+    // Compatibilidad por si había un valor antiguo guardado como texto.
+    if(!Array.isArray(incidencias)) incidencias = [];
+
+    if(incidencias.includes(valor)){
+      incidencias = incidencias.filter(x => x !== valor);
+    } else {
+      incidencias = [...incidencias, valor];
+    }
+
+    datosFinalizacion[maquina].incidencias = incidencias;
+    pintarPantalla();
+  }
+
+  async function cambiarMaquinaPaciente(id, numero, maquinaActual, maquinaNueva){
+    if(operacionEnCurso || maquinaActual===maquinaNueva)return;
+    operacionEnCurso=true;
+
+    // El cambio se hace mediante una RPC SECURITY DEFINER de Supabase.
+    // Así no necesitamos permiso UPDATE directo sobre la tabla pacientes y
+    // la comprobación de máquina libre se hace de forma segura en la BD.
+    const {data,error}=await db.rpc('cambiar_paciente_maquina',{
+      p_id:id,
+      p_maquina_actual:maquinaActual,
+      p_maquina_nueva:maquinaNueva
+    });
+
+    operacionEnCurso=false;
+    if(error){
+      console.error(error);
+      mostrarMensaje('No se pudo cambiar de máquina: '+error.message,'error');
+      await cargarPacientes();
+      return;
+    }
+    if(!data){
+      mostrarMensaje('No se pudo realizar el cambio. Actualizando…','error');
+      await cargarPacientes();
+      return;
+    }
+
+    // Conserva método, incidencia y comentario aunque el paciente cambie de máquina.
+    if(datosFinalizacion[maquinaActual]){
+      datosFinalizacion[maquinaNueva]=datosFinalizacion[maquinaActual];
+      delete datosFinalizacion[maquinaActual];
+    }
+
+    mostrarMensaje(`Paciente ${numero} cambiado de ${maquinaActual} a ${maquinaNueva}.`,'ok');
+    await cargarPacientes();
+  }
+
+  async function finalizarDesdeMaquina(id,numero,maquina){
+    if(operacionEnCurso)return;
+    const datos = datosFinalizacion[maquina] || {};
+    const metodo = datos.metodo || '';
+    const incidencias = Array.isArray(datos.incidencias) ? datos.incidencias : [];
+    const comentario = (datos.comentario || '').trim();
+
+    if(!metodo){
+      mostrarMensaje(`Selecciona DNI o Tarjeta sanitaria antes de finalizar ${maquina}.`,'error');
+      document.getElementById(`metodo_${maquina}`)?.focus();
+      return;
+    }
+
+    operacionEnCurso=true;
+
+    const {error:errorDatos}=await db.rpc('guardar_datos_paciente_multiple',{
+      p_id:id,
+      p_metodo:metodo,
+      p_incidencias:incidencias,
+      p_comentario:comentario
+    });
+    if(errorDatos){
+      operacionEnCurso=false;
+      console.error(errorDatos);
+      mostrarMensaje('No se pudieron guardar método/incidencia/comentario: '+errorDatos.message,'error');
+      return;
+    }
+
+    const {error}=await db.rpc('finalizar_paciente',{p_id:id});
+    operacionEnCurso=false;
+    if(error){console.error(error);mostrarMensaje(error.message,'error');await cargarPacientes();return}
+
+    delete datosFinalizacion[maquina];
+    mostrarMensaje(`Paciente ${numero} finalizado en ${maquina}. Máquina liberada.`,'ok');
+    await cargarPacientes();
+  }
+
+  function pintarMaquina(m){
+    const cont=document.getElementById('maquina_'+m.id);
+    const p=pacientes.find(x=>x.estado==='maquina'&&x.maquina===m.id);
+    if(!p){
+      cont.innerHTML=`<button class="btn-maquina ${m.clase}" onclick="pasarSiguienteAMaquina('${m.cola}','${m.id}')">${m.id}</button>`;
+      return;
+    }
+    const tMaq=segundosDesde(p.hora_maquina);
+    const seleccion = datosFinalizacion[m.id] || {};
+    const metodo = seleccion.metodo || '';
+    const incidencias = Array.isArray(seleccion.incidencias) ? seleccion.incidencias : [];
+    const comentario = seleccion.comentario || '';
+    const libres = maquinas.filter(x=>x.cola===m.cola && x.id!==m.id && !pacientes.some(pac=>pac.estado==='maquina'&&pac.maquina===x.id));
+
+    const botonMetodo=(valor,texto)=>`<button type="button" class="btn-opcion btn-metodo ${metodo===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','metodo','${valor}')">${texto}</button>`;
+    const botonIncidencia=(valor,texto)=>`<button type="button" class="btn-opcion btn-incidencia ${incidencias.includes(valor)?'activo':''}" onclick="toggleIncidencia('${m.id}','${valor.replace(/'/g,"\\'")}')">${texto}</button>`;
+    const botonesCambio=libres.length
+      ? libres.map(x=>`<button type="button" class="btn-opcion btn-cambio" onclick="cambiarMaquinaPaciente(${p.id},${p.numero},'${m.id}','${x.id}')">${x.id}</button>`).join('')
+      : '<div class="sin-maquinas-libres">No hay otras máquinas libres.</div>';
+
+    cont.innerHTML=`
+      <button class="btn-maquina ocupada" onclick="finalizarDesdeMaquina(${p.id},${p.numero},'${m.id}')">${m.id} · FINALIZAR PACIENTE</button>
+      <div class="tarjeta-maquina">
+        <div class="paciente-numero">Paciente ${p.numero}</div>
+        <div class="tiempo-activo" id="tiempoMaq_${m.id}">${formatearDuracion(tMaq)}</div>
+        <div class="datos-finalizacion">
+          <div class="campo">
+            <label>Método</label>
+            <div class="grupo-botones">
+              ${botonMetodo('DNI','DNI')}
+              ${botonMetodo('Tarjeta sanitaria','Tarjeta sanitaria')}
+            </div>
+          </div>
+          <div class="campo">
+            <label>Incidencias · puedes marcar varias</label>
+            <div class="grupo-botones">
+              ${botonIncidencia('Finalmente falla','Finalmente falla')}
+              ${botonIncidencia('Prueba a meter la tarjeta varias veces','Tarjeta varias veces')}
+              ${botonIncidencia('Prueba varios métodos','Prueba varios métodos')}
+              ${botonIncidencia('Se cambia de máquina','Se cambia de máquina')}
+              ${botonIncidencia('Pide ayuda','Pide ayuda')}
+              ${botonIncidencia('Se equivoca al meter el DNI','Se equivoca al meter DNI')}
+              ${botonIncidencia('Falla la lectura de tarjeta','Falla lectura tarjeta')}
+              ${botonIncidencia('Tarda en encontrar la tarjeta','Tarda en encontrar tarjeta')}
+              ${botonIncidencia('La máquina tarda en procesar la petición','Máquina tarda en procesar')}
+            </div>
+          </div>
+          <div class="campo campo-otra">
+            <label for="comentario_${m.id}">Comentario</label>
+            <input id="comentario_${m.id}" type="text" value="${comentario.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" placeholder="Escribe aquí cualquier observación…" oninput="guardarComentario('${m.id}',this.value)">
+          </div>
+          <div class="campo campo-cambio separador-cambio">
+            <label>Cambio de máquina · solo aparecen las libres</label>
+            <div class="grupo-botones">${botonesCambio}</div>
+          </div>
+        </div>
+        <div class="aviso-finalizar">Selecciona el método y pulsa de nuevo ${m.id} para sacar al paciente.</div>
+      </div>`;
+  }
+
+  function tarjetaCola(p){
+    const d=document.createElement('div');d.className='paciente-card'+(p.cola==='Izquierda'?' izq':'');
+    d.innerHTML=`<div class="paciente-header"><div class="paciente-numero">Paciente ${p.numero}</div><div class="tiempo-activo" id="tiempoCola_${p.id}">${formatearDuracion(segundosDesde(p.hora_cola))}</div></div><div class="detalle">Entrada en cola: ${formatearHora(p.hora_cola)}</div>`;
+    return d;
+  }
+
+  function pintarPantalla(){
+    maquinas.forEach(pintarMaquina);
+    const izq=pacientes.filter(p=>p.estado==='cola'&&p.cola==='Izquierda');
+    const der=pacientes.filter(p=>p.estado==='cola'&&p.cola==='Derecha');
+    const maq=pacientes.filter(p=>p.estado==='maquina' && maquinas.some(m=>m.id===p.maquina));
+    const fin=pacientes.filter(p=>p.estado==='finalizado').sort((a,b)=>new Date(b.hora_papel)-new Date(a.hora_papel));
+
+    const li=document.getElementById('listaIzq'),ld=document.getElementById('listaDer');li.innerHTML='';ld.innerHTML='';
+    if(!izq.length)li.innerHTML='<p>No hay pacientes esperando.</p>';if(!der.length)ld.innerHTML='<p>No hay pacientes esperando.</p>';
+    izq.forEach(p=>li.appendChild(tarjetaCola(p)));der.forEach(p=>ld.appendChild(tarjetaCola(p)));
+    document.getElementById('contadorIzq').textContent=izq.length;document.getElementById('contadorDer').textContent=der.length;document.getElementById('contadorMaq').textContent=maq.length;
+
+    const tb=document.getElementById('tablaFinalizados');tb.innerHTML='';
+    fin.forEach(p=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${p.numero}</td><td>${p.cola}</td><td>${p.maquina||'-'}</td><td>${formatearFechaHora(p.hora_cola)}</td><td>${formatearFechaHora(p.hora_maquina)}</td><td>${formatearFechaHora(p.hora_papel)}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_maquina))}</td><td>${formatearDuracion(segundosEntre(p.hora_maquina,p.hora_papel))}</td><td>${formatearDuracion(segundosEntre(p.hora_cola,p.hora_papel))}</td><td>${p.metodo||'-'}</td><td>${p.incidencia||'Sin incidencia'}</td><td>${p.comentario||'-'}</td>`;
+      tb.appendChild(tr);
+    });
+    if(!fin.length)tb.innerHTML='<tr><td colspan="12">No hay pacientes finalizados.</td></tr>';
+  }
+
+  function descargarCSV(){
+    const fin=pacientes.filter(p=>p.estado==='finalizado').sort((a,b)=>new Date(a.hora_papel)-new Date(b.hora_papel));
+    if(!fin.length){mostrarMensaje('No hay pacientes finalizados para exportar.','error');return}
+    let csv='\uFEFFPaciente;Cola;Máquina;Entrada en cola;Entrada en máquina;Ticket expedido;Tiempo cola segundos;Tiempo máquina segundos;Tiempo total segundos;Método;Incidencia;Comentario\n';
+    fin.forEach(p=>{csv += [p.numero,p.cola,p.maquina||'',formatearFechaHora(p.hora_cola),formatearFechaHora(p.hora_maquina),formatearFechaHora(p.hora_papel),segundosEntre(p.hora_cola,p.hora_maquina),segundosEntre(p.hora_maquina,p.hora_papel),segundosEntre(p.hora_cola,p.hora_papel),p.metodo||'',p.incidencia||'Sin incidencia',p.comentario||''].join(';')+'\n'});
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tiempos_hall_colas_maquinas.csv';a.click();URL.revokeObjectURL(url);
+  }
+
+  db.channel('pacientes-maquinas-tiempo-real')
+    .on('postgres_changes',{event:'*',schema:'public',table:'pacientes'},()=>cargarPacientes())
+    .subscribe(status=>{if(status==='SUBSCRIBED')setConexion('ok','Conectado · datos compartidos en tiempo real')});
+
+  function actualizarCronometros(){
+    pacientes.filter(p=>p.estado==='maquina').forEach(p=>{
+      const maq=p.maquina;
+      const eMaq=document.getElementById(`tiempoMaq_${maq}`);
+      const eTotal=document.getElementById(`tiempoTotal_${maq}`);
+      if(eMaq)eMaq.textContent=formatearDuracion(segundosDesde(p.hora_maquina));
+      if(eTotal)eTotal.textContent=formatearDuracion(segundosDesde(p.hora_cola));
+    });
+
+    pacientes.filter(p=>p.estado==='cola').forEach(p=>{
+      const e=document.getElementById(`tiempoCola_${p.id}`);
+      if(e)e.textContent=formatearDuracion(segundosDesde(p.hora_cola));
+    });
+  }
+
+  setInterval(actualizarCronometros,1000);
+  cargarPacientes();
+</script>
+</body>
+</html>

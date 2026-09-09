@@ -10,11 +10,11 @@
     .contenedor{max-width:900px;margin:auto}
     .cabecera{text-align:center;margin:35px 0 30px}
     h1{font-size:38px;margin:0 0 10px}.sub{color:#6b7280;font-size:17px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
     .tarjeta{background:white;border:1px solid #e5e7eb;border-radius:18px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;flex-direction:column;min-height:270px}
     .icono{font-size:42px;margin-bottom:12px}.tarjeta h2{margin:0 0 10px;font-size:22px}.tarjeta p{color:#6b7280;line-height:1.5;flex:1}
     a{display:block;text-decoration:none;text-align:center;border-radius:12px;padding:15px 12px;font-weight:bold;color:white;background:#2563eb}
-    .maquinas a{background:#16a34a}.takt a{background:#7c3aed}
+    .maquinas a{background:#16a34a}.maquinas2 a{background:#0f766e}.takt a{background:#7c3aed}
     .pie{text-align:center;color:#6b7280;font-size:13px;margin-top:25px}
     @media(max-width:760px){body{padding:15px}.grid{grid-template-columns:1fr}.tarjeta{min-height:auto}h1{font-size:30px}}
   </style>
@@ -36,9 +36,16 @@
 
       <div class="tarjeta maquinas">
         <div class="icono">🖥️</div>
-        <h2>Máquinas</h2>
-        <p>Visualiza las colas compartidas, asigna el siguiente paciente a una máquina y finaliza al expedir el ticket.</p>
-        <a href="Crono_tiempo_maquina.html">Abrir máquinas</a>
+        <h2>Máquinas D1 · D2</h2>
+        <p>Gestiona únicamente las máquinas D1 y D2: asignación, incidencias múltiples, comentarios, cambios entre máquinas libres y finalización.</p>
+        <a href="Crono_maquinas_D1_D2.html">Abrir D1 · D2</a>
+      </div>
+
+      <div class="tarjeta maquinas2">
+        <div class="icono">🖥️</div>
+        <h2>Máquinas D3 · D4</h2>
+        <p>Gestiona únicamente las máquinas D3 y D4: asignación, incidencias múltiples, comentarios, cambios entre máquinas libres y finalización.</p>
+        <a href="Crono_maquinas_D3_D4.html">Abrir D3 · D4</a>
       </div>
 
       <div class="tarjeta takt">
@@ -49,7 +56,7 @@
       </div>
     </div>
 
-    <div class="pie">Entrada/colas y máquinas comparten datos. Takt Time mantiene sesiones independientes.</div>
+    <div class="pie">Entrada/colas y las dos pantallas de máquinas comparten datos. Takt Time mantiene sesiones independientes.</div>
   </div>
 </body>
 </html>
