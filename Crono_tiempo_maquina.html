@@ -20,7 +20,8 @@
     .maquina-box { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
     button { border:none; border-radius:12px; padding:12px 16px; font-size:15px; cursor:pointer; font-weight:bold; }
     button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#dc2626}.btn-csv{background:#7c3aed;color:#fff}
-    .datos-finalizacion{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.campo label{display:block;font-size:12px;font-weight:bold;color:#4b5563;margin:0 0 5px}.campo select,.campo input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px}.campo-otra{grid-column:1/-1}.aviso-finalizar{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
+    .datos-finalizacion{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}.campo label{display:block;font-size:12px;font-weight:bold;color:#4b5563;margin:0 0 7px}.campo input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;box-sizing:border-box}.campo-otra,.campo-cambio{grid-column:1/-1}.aviso-finalizar{font-size:12px;color:#6b7280;text-align:center;margin-top:8px}
+    .grupo-botones{display:flex;gap:7px;flex-wrap:wrap}.btn-opcion{padding:9px 11px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:9px;font-size:13px;line-height:1.15;box-shadow:none}.btn-opcion:hover{background:#eef2f7;opacity:1}.btn-opcion.activo{background:#0f172a;color:#fff;border-color:#0f172a}.btn-metodo{flex:1;min-width:125px}.btn-incidencia{flex:1 1 135px}.separador-cambio{border-top:1px solid #e5e7eb;margin-top:2px;padding-top:12px}.btn-cambio{background:#ecfdf5;color:#166534;border:1px solid #86efac;min-width:60px}.btn-cambio:hover{background:#dcfce7}.sin-maquinas-libres{font-size:13px;color:#6b7280;padding:8px 0}
     .tarjeta-maquina { margin-top:12px; padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f59e0b; border-radius:12px; }
     .paciente-numero{font-size:22px;font-weight:bold;margin-bottom:8px}.tiempo-activo{font-size:22px;font-weight:bold;margin-bottom:8px}.detalle{color:#4b5563;font-size:14px;margin-bottom:6px}
     .contador-central { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:15px; text-align:center; line-height:1.9; color:#374151; }
@@ -131,6 +132,47 @@
     datosFinalizacion[maquina].comentario = valor;
   }
 
+  function seleccionarOpcion(maquina, campo, valor){
+    guardarSeleccion(maquina, campo, valor);
+    pintarPantalla();
+  }
+
+  async function cambiarMaquinaPaciente(id, numero, maquinaActual, maquinaNueva){
+    if(operacionEnCurso || maquinaActual===maquinaNueva)return;
+    operacionEnCurso=true;
+
+    // El cambio se hace mediante una RPC SECURITY DEFINER de Supabase.
+    // Así no necesitamos permiso UPDATE directo sobre la tabla pacientes y
+    // la comprobación de máquina libre se hace de forma segura en la BD.
+    const {data,error}=await db.rpc('cambiar_paciente_maquina',{
+      p_id:id,
+      p_maquina_actual:maquinaActual,
+      p_maquina_nueva:maquinaNueva
+    });
+
+    operacionEnCurso=false;
+    if(error){
+      console.error(error);
+      mostrarMensaje('No se pudo cambiar de máquina: '+error.message,'error');
+      await cargarPacientes();
+      return;
+    }
+    if(!data){
+      mostrarMensaje('No se pudo realizar el cambio. Actualizando…','error');
+      await cargarPacientes();
+      return;
+    }
+
+    // Conserva método, incidencia y comentario aunque el paciente cambie de máquina.
+    if(datosFinalizacion[maquinaActual]){
+      datosFinalizacion[maquinaNueva]=datosFinalizacion[maquinaActual];
+      delete datosFinalizacion[maquinaActual];
+    }
+
+    mostrarMensaje(`Paciente ${numero} cambiado de ${maquinaActual} a ${maquinaNueva}.`,'ok');
+    await cargarPacientes();
+  }
+
   async function finalizarDesdeMaquina(id,numero,maquina){
     if(operacionEnCurso)return;
     const datos = datosFinalizacion[maquina] || {};
@@ -175,11 +217,19 @@
       cont.innerHTML=`<button class="btn-maquina ${m.clase}" onclick="pasarSiguienteAMaquina('${m.cola}','${m.id}')">${m.id}</button>`;
       return;
     }
-    const tMaq=segundosDesde(p.hora_maquina),tTotal=segundosDesde(p.hora_cola),tCola=segundosEntre(p.hora_cola,p.hora_maquina);
+    const tMaq=segundosDesde(p.hora_maquina);
     const seleccion = datosFinalizacion[m.id] || {};
     const metodo = seleccion.metodo || '';
     const incidencia = seleccion.incidencia || 'Sin incidencia';
     const comentario = seleccion.comentario || '';
+    const libres = maquinas.filter(x=>x.cola===m.cola && x.id!==m.id && !pacientes.some(pac=>pac.estado==='maquina'&&pac.maquina===x.id));
+
+    const botonMetodo=(valor,texto)=>`<button type="button" class="btn-opcion btn-metodo ${metodo===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','metodo','${valor}')">${texto}</button>`;
+    const botonIncidencia=(valor,texto)=>`<button type="button" class="btn-opcion btn-incidencia ${incidencia===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','incidencia','${valor.replace(/'/g,"\\'")}')">${texto}</button>`;
+    const botonesCambio=libres.length
+      ? libres.map(x=>`<button type="button" class="btn-opcion btn-cambio" onclick="cambiarMaquinaPaciente(${p.id},${p.numero},'${m.id}','${x.id}')">${x.id}</button>`).join('')
+      : '<div class="sin-maquinas-libres">No hay otras máquinas libres.</div>';
+
     cont.innerHTML=`
       <button class="btn-maquina ocupada" onclick="finalizarDesdeMaquina(${p.id},${p.numero},'${m.id}')">${m.id} · FINALIZAR PACIENTE</button>
       <div class="tarjeta-maquina">
@@ -187,28 +237,33 @@
         <div class="tiempo-activo" id="tiempoMaq_${m.id}">${formatearDuracion(tMaq)}</div>
         <div class="datos-finalizacion">
           <div class="campo">
-            <label for="metodo_${m.id}">Método</label>
-            <select id="metodo_${m.id}" onchange="guardarSeleccion('${m.id}','metodo',this.value)">
-              <option value="" ${metodo===''?'selected':''}>Seleccionar…</option>
-              <option value="DNI" ${metodo==='DNI'?'selected':''}>DNI</option>
-              <option value="Tarjeta sanitaria" ${metodo==='Tarjeta sanitaria'?'selected':''}>Tarjeta sanitaria</option>
-            </select>
+            <label>Método</label>
+            <div class="grupo-botones">
+              ${botonMetodo('DNI','DNI')}
+              ${botonMetodo('Tarjeta sanitaria','Tarjeta sanitaria')}
+            </div>
           </div>
           <div class="campo">
-            <label for="incidencia_${m.id}">Incidencia</label>
-            <select id="incidencia_${m.id}" onchange="guardarSeleccion('${m.id}','incidencia',this.value)">
-              <option value="Sin incidencia" ${incidencia==='Sin incidencia'?'selected':''}>Sin incidencia</option>
-              <option value="Sin papel" ${incidencia==='Sin papel'?'selected':''}>Sin papel</option>
-              <option value="No entrega papel" ${incidencia==='No entrega papel'?'selected':''}>No entrega papel</option>
-              <option value="Sin Wi-Fi" ${incidencia==='Sin Wi-Fi'?'selected':''}>Sin Wi-Fi</option>
-              <option value="Fallo lectura tarjeta sanitaria" ${incidencia==='Fallo lectura tarjeta sanitaria'?'selected':''}>Fallo lectura T. sanitaria</option>
-              <option value="Fallo lectura DNI" ${incidencia==='Fallo lectura DNI'?'selected':''}>Fallo lectura DNI</option>
-              <option value="Otra" ${incidencia==='Otra'?'selected':''}>Otra</option>
-            </select>
+            <label>Incidencia</label>
+            <div class="grupo-botones">
+              ${botonIncidencia('Finalmente falla','Finalmente falla')}
+              ${botonIncidencia('Prueba a meter la tarjeta varias veces','Tarjeta varias veces')}
+              ${botonIncidencia('Prueba varios métodos','Prueba varios métodos')}
+              ${botonIncidencia('Se cambia de máquina','Se cambia de máquina')}
+              ${botonIncidencia('Pide ayuda','Pide ayuda')}
+              ${botonIncidencia('Se equivoca al meter el DNI','Se equivoca al meter DNI')}
+              ${botonIncidencia('Falla la lectura de tarjeta','Falla lectura tarjeta')}
+              ${botonIncidencia('Tarda en encontrar la tarjeta','Tarda en encontrar tarjeta')}
+              ${botonIncidencia('La máquina tarda en procesar la petición','Máquina tarda en procesar')}
+            </div>
           </div>
           <div class="campo campo-otra">
             <label for="comentario_${m.id}">Comentario</label>
             <input id="comentario_${m.id}" type="text" value="${comentario.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" placeholder="Escribe aquí cualquier observación…" oninput="guardarComentario('${m.id}',this.value)">
+          </div>
+          <div class="campo campo-cambio separador-cambio">
+            <label>Cambio de máquina · solo aparecen las libres</label>
+            <div class="grupo-botones">${botonesCambio}</div>
           </div>
         </div>
         <div class="aviso-finalizar">Selecciona el método y pulsa de nuevo ${m.id} para sacar al paciente.</div>
