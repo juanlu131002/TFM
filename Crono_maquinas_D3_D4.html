@@ -13,10 +13,15 @@
     .estado-conexion { display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:#e5e7eb; font-size:13px; margin-bottom:15px; }
     .punto { width:9px; height:9px; border-radius:50%; background:#f59e0b; }
     .punto.ok { background:#16a34a; }.punto.error{background:#dc2626}
-    .hall-panel { min-height:420px; background:#f9fafb; border:2px solid #e5e7eb; border-radius:18px; padding:25px; display:grid; grid-template-columns:1.25fr 1fr; gap:25px; align-items:start; }
+    .hall-panel { min-height:420px; background:#f9fafb; border:2px solid #e5e7eb; border-radius:18px; padding:25px; display:block; }
     .zona-lateral,.zona-centro { display:flex; flex-direction:column; gap:18px; }
     .zona-izquierda { padding-top:20px; }.zona-derecha{padding-top:20px}.zona-centro{justify-content:center;padding-top:55px}
     .zona-lateral h3,.zona-centro h3 { text-align:center; margin-top:0; color:#374151; }
+
+    .maquinas-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+    .maquinas-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+    .maquinas-col h3{text-align:center;margin:0 0 4px;color:#374151}
+
     .maquina-box { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
     button { border:none; border-radius:12px; padding:12px 16px; font-size:15px; cursor:pointer; font-weight:bold; }
     button:hover { opacity:.92; }.btn-maquina{width:100%;min-height:80px;color:#fff;font-size:26px}.btn-i{background:#0e7490}.btn-d{background:#1d4ed8}.ocupada{background:#dc2626}.btn-csv{background:#7c3aed;color:#fff}
@@ -29,7 +34,7 @@
     .columnas { display:grid; grid-template-columns:1fr 1fr; gap:20px; }.lista{display:flex;flex-direction:column;gap:12px;margin-top:15px}.paciente-card{border:1px solid #e5e7eb;border-left:6px solid #2563eb;border-radius:12px;padding:14px;background:#f9fafb}.paciente-card.izq{border-left-color:#0891b2}.paciente-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
     table { width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; background:#fff; } th,td{border:1px solid #d1d5db;padding:8px;text-align:center}th{background:#e5e7eb}
     .barra { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
-    @media(max-width:1000px){body{padding:15px}.hall-panel{grid-template-columns:1fr;min-height:auto}.zona-izquierda,.zona-derecha,.zona-centro{padding-top:0}.columnas{grid-template-columns:1fr}}
+    @media(max-width:1000px){body{padding:15px}.hall-panel{min-height:auto}.maquinas-grid{grid-template-columns:1fr}.zona-izquierda,.zona-derecha,.zona-centro{padding-top:0}.columnas{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -40,14 +45,17 @@
 
   <div class="panel">
     <div class="hall-panel">
-      <div class="zona-lateral zona-derecha">
-        <h3>Máquinas D3–D4</h3>
-        <div id="maquina_D3" class="maquina-box"></div>
-        <div id="maquina_D4" class="maquina-box"></div>
+      <h3 style="text-align:center;margin-top:0;color:#374151;">Máquinas D3–D4</h3>
+      <div class="maquinas-grid">
+        <div class="maquinas-col">
+          <div id="maquina_D3" class="maquina-box"></div>
+        </div>
+        <div class="maquinas-col">
+          <div id="maquina_D4" class="maquina-box"></div>
+        </div>
       </div>
 
-      <div class="zona-centro">
-        <h3>Pacientes esperando</h3>
+      <div style="margin-top:22px">
         <div class="contador-central">
           <div>Derecha: <strong id="contadorDer">0</strong></div>
           <div>En estas máquinas: <strong id="contadorMaq">0</strong></div>
