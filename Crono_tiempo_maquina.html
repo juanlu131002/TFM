@@ -137,6 +137,23 @@
     pintarPantalla();
   }
 
+  function toggleIncidencia(maquina, valor){
+    datosFinalizacion[maquina] = datosFinalizacion[maquina] || {};
+    let incidencias = datosFinalizacion[maquina].incidencias;
+
+    // Compatibilidad por si había un valor antiguo guardado como texto.
+    if(!Array.isArray(incidencias)) incidencias = [];
+
+    if(incidencias.includes(valor)){
+      incidencias = incidencias.filter(x => x !== valor);
+    } else {
+      incidencias = [...incidencias, valor];
+    }
+
+    datosFinalizacion[maquina].incidencias = incidencias;
+    pintarPantalla();
+  }
+
   async function cambiarMaquinaPaciente(id, numero, maquinaActual, maquinaNueva){
     if(operacionEnCurso || maquinaActual===maquinaNueva)return;
     operacionEnCurso=true;
@@ -177,7 +194,7 @@
     if(operacionEnCurso)return;
     const datos = datosFinalizacion[maquina] || {};
     const metodo = datos.metodo || '';
-    const incidencia = datos.incidencia || 'Sin incidencia';
+    const incidencias = Array.isArray(datos.incidencias) ? datos.incidencias : [];
     const comentario = (datos.comentario || '').trim();
 
     if(!metodo){
@@ -188,10 +205,10 @@
 
     operacionEnCurso=true;
 
-    const {error:errorDatos}=await db.rpc('guardar_datos_paciente',{
+    const {error:errorDatos}=await db.rpc('guardar_datos_paciente_multiple',{
       p_id:id,
       p_metodo:metodo,
-      p_incidencia:incidencia,
+      p_incidencias:incidencias,
       p_comentario:comentario
     });
     if(errorDatos){
@@ -220,12 +237,12 @@
     const tMaq=segundosDesde(p.hora_maquina);
     const seleccion = datosFinalizacion[m.id] || {};
     const metodo = seleccion.metodo || '';
-    const incidencia = seleccion.incidencia || 'Sin incidencia';
+    const incidencias = Array.isArray(seleccion.incidencias) ? seleccion.incidencias : [];
     const comentario = seleccion.comentario || '';
     const libres = maquinas.filter(x=>x.cola===m.cola && x.id!==m.id && !pacientes.some(pac=>pac.estado==='maquina'&&pac.maquina===x.id));
 
     const botonMetodo=(valor,texto)=>`<button type="button" class="btn-opcion btn-metodo ${metodo===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','metodo','${valor}')">${texto}</button>`;
-    const botonIncidencia=(valor,texto)=>`<button type="button" class="btn-opcion btn-incidencia ${incidencia===valor?'activo':''}" onclick="seleccionarOpcion('${m.id}','incidencia','${valor.replace(/'/g,"\\'")}')">${texto}</button>`;
+    const botonIncidencia=(valor,texto)=>`<button type="button" class="btn-opcion btn-incidencia ${incidencias.includes(valor)?'activo':''}" onclick="toggleIncidencia('${m.id}','${valor.replace(/'/g,"\\'")}')">${texto}</button>`;
     const botonesCambio=libres.length
       ? libres.map(x=>`<button type="button" class="btn-opcion btn-cambio" onclick="cambiarMaquinaPaciente(${p.id},${p.numero},'${m.id}','${x.id}')">${x.id}</button>`).join('')
       : '<div class="sin-maquinas-libres">No hay otras máquinas libres.</div>';
@@ -244,7 +261,7 @@
             </div>
           </div>
           <div class="campo">
-            <label>Incidencia</label>
+            <label>Incidencias · puedes marcar varias</label>
             <div class="grupo-botones">
               ${botonIncidencia('Finalmente falla','Finalmente falla')}
               ${botonIncidencia('Prueba a meter la tarjeta varias veces','Tarjeta varias veces')}
